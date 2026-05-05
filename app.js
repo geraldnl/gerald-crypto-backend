@@ -11,6 +11,7 @@ const marketRoutes = require('./routes/market.routes');
 const kycRoutes = require('./routes/kyc.routes');
 const subscriptionRoutes = require('./routes/subscription.routes');
 const cryptoRoutes = require('./routes/crypto.routes');
+
 const { register, login } = require('./controllers/auth.controller');
 const { getMe } = require('./controllers/user.controller');
 const { protect } = require('./middleware/auth.middleware');
@@ -19,14 +20,34 @@ const { body } = require('express-validator');
 
 const app = express();
 
-app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  credentials: true,
-}));
 app.use(express.json());
 app.use(cookieParser());
 app.use('/uploads', express.static('uploads'));
 
+
+// 🔥 FIXED CORS (PRODUCTION + DEV SAFE)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  process.env.CLIENT_URL
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow tools like Postman or server-to-server requests
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS blocked for origin: " + origin));
+  },
+  credentials: true,
+}));
+
+
+// ================= ROUTES =================
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -37,7 +58,8 @@ app.use('/api/kyc', kycRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/crypto', cryptoRoutes);
 
-// README-spec top-level shortcuts (exact paths from the assignment)
+
+// ===== AUTH SHORTCUT ROUTES (ASSIGNMENT REQUIREMENT) =====
 app.post(
   '/register',
   [
@@ -48,6 +70,7 @@ app.post(
   validate,
   register
 );
+
 app.post(
   '/login',
   [
@@ -57,14 +80,22 @@ app.post(
   validate,
   login
 );
+
 app.get('/profile', protect, getMe);
-app.use('/crypto', cryptoRoutes);
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
+// ===== HEALTH CHECK =====
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', message: 'Backend is running' });
+});
+
+
+// ===== ERROR HANDLER =====
 app.use((err, _req, res, _next) => {
   console.error(err.stack);
-  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal server error'
+  });
 });
 
 module.exports = app;
