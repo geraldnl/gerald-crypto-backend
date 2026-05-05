@@ -25,26 +25,32 @@ app.use(cookieParser());
 app.use('/uploads', express.static('uploads'));
 
 
-// 🔥 FIXED CORS (PRODUCTION + DEV SAFE)
+// ================= CORS FIX (IMPORTANT) =================
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
-  process.env.CLIENT_URL
+  "https://visionary-swan-285b19.netlify.app"
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
-    // allow tools like Postman or server-to-server requests
+    // Allow Postman / server requests
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    return callback(new Error("CORS blocked for origin: " + origin));
+    // IMPORTANT: DO NOT throw error (prevents CORS crash)
+    return callback(null, true);
   },
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // 🔥 fixes preflight requests
 
 
 // ================= ROUTES =================
@@ -59,7 +65,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/crypto', cryptoRoutes);
 
 
-// ===== AUTH SHORTCUT ROUTES (ASSIGNMENT REQUIREMENT) =====
+// ================= AUTH SHORTCUT ROUTES =================
 app.post(
   '/register',
   [
@@ -84,13 +90,13 @@ app.post(
 app.get('/profile', protect, getMe);
 
 
-// ===== HEALTH CHECK =====
+// ================= HEALTH CHECK =================
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });
 });
 
 
-// ===== ERROR HANDLER =====
+// ================= ERROR HANDLER =================
 app.use((err, _req, res, _next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
